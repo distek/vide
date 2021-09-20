@@ -1,0 +1,60 @@
+#!/bin/bash
+
+projectsFile="$HOME/.config/projects/projects"
+
+function getProject() {
+    projects=($(cat $projectsFile))
+
+    projectName=$(for p in ${projects[@]}; do
+        echo "$p" | awk -F',' '{print $1}'
+    done | fzf)
+
+    projectDir=$(grep $projectName $projectsFile | awk -F',' '{print $2}')
+
+    echo "$projectName $projectDir"
+}
+
+function selectProject() {
+    project=($(getProject))
+
+
+    echo "${project[1]}"
+}
+
+function save() {
+    echo "$1,$(pwd)" >> $projectsFile
+}
+
+function del() {
+    projects=($(cat $projectsFile))
+
+    projectName=$(for p in ${projects[@]}; do
+        echo "$p" | awk -F',' '{print $1}'
+    done | fzf)
+
+    echo -n "" > $projectsFile
+
+    for p in ${projects[@]}; do
+        pName=$(echo $p | awk -F',' '{print $1}')
+        if echo $pName | grep "^$projectName\$" >/dev/null; then
+            continue 
+        fi
+
+        echo "$p" >> $projectsFile
+    done
+}
+
+case $1 in
+    select) selectProject;;
+    save) 
+        if [ "$2" = "" ]; then
+            echo "Please provide a project name.
+            ex: projects save project-name
+            "
+            exit 1
+        fi
+
+        save "$2"
+        ;;
+    del) del;;
+esac
