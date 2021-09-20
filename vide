@@ -1,0 +1,50 @@
+#!/bin/bash
+
+files=($@)
+
+session=0
+
+for s in $(tmux ls); do
+    if echo "$s" | grep -i "vide[0-9]" > /dev/null; then
+        if tmux ls -F '#{session_name}' | grep "vide$session" > /dev/null; then
+            let session++
+        else
+            break
+        fi
+    fi
+done
+
+# set -x
+# bgColor=$(xrdb -query | grep -i background | awk '{print $2}')
+# borderBgColor=$(xrdb -query | grep -i color0 | awk '{print $2}')
+# fgColor=$(xrdb -query | grep -i "color1:" | awk '{print $2}')
+# set +x
+
+# if ! echo $bgColor | grep "#.*" >/dev/null; then
+#     bgColor="NONE"
+# fi
+
+# if ! echo $fgColor | grep "#.*" >/dev/null; then
+#     fgColor="#ababab"
+# fi
+
+cd $(projects select)
+
+tmux new-session -d -s vide$session ' sleep 0.5; nvim --listen /tmp/videsock ; \
+    tmux kill-session -t vide$session'
+
+# Not sure of a better way to handle removing the second terminal if cols is < 120
+if [[ $(tput cols) < 120 ]]; then
+    tmux a -d -t vide$session \; \
+        split-window -v ' bash' \; \
+        resize-pane -t 1 -y 10 \; \
+        select-pane -t 0 \; \
+        select-pane -t 0
+else
+    tmux a -d -t vide$session \; \
+        split-window -h ' bash' \; \
+        split-window -v ' bash' \; \
+        resize-pane -t 1 -x 32% \; \
+        resize-pane -t 2 -x 32% \; \
+        select-pane -t 0
+fi
