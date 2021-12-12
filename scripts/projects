@@ -2,21 +2,32 @@
 
 projectsFile="$HOME/.config/projects/projects"
 
+function printUsage() {
+    echo "Usage:
+$0 [list|select] [save|del [project name]]
+    list                    list all saved projects
+    select                  (fzf-select) prints full path to project directory on selection
+    save [project name]     save project path as [project name]
+    del                     (fzf-select) remove selected project from projects
+"
+    exit
+}
+
 function getProject() {
     projects=($(cat $projectsFile))
 
     projectName=$(for p in ${projects[@]}; do
-        echo "$p" | awk -F',' '{print $1}'
+        echo "$p" | cut -d',' -f1 
     done | fzf)
 
-    projectDir=$(grep $projectName $projectsFile | awk -F',' '{print $2}')
-
-    echo "$projectName $projectDir"
+    if [ ! -z projectName ]; then
+        projectDir=$(grep $projectName $projectsFile | cut -d',' -f2)
+        echo "$projectName $projectDir"
+    fi
 }
 
 function selectProject() {
     project=($(getProject))
-
 
     echo "${project[1]}"
 }
@@ -25,7 +36,7 @@ function save() {
     echo "$1,$(pwd)" >> $projectsFile
 }
 
-function del() {
+function delProject() {
     projects=($(cat $projectsFile))
 
     projectName=$(for p in ${projects[@]}; do
@@ -45,6 +56,11 @@ function del() {
 }
 
 case $1 in
+    help|--help|-h)
+        printUsage
+        exit 0
+        ;;
+    list) cat $projectsFile | tr "," " " | column -t;;
     select) selectProject;;
     save) 
         if [ "$2" = "" ]; then
@@ -56,5 +72,10 @@ case $1 in
 
         save "$2"
         ;;
-    del) del;;
+    del) delProject;;
+    *)
+        echo "Uknown argument: $1"
+        printUsage
+        exit 1
+        ;;
 esac

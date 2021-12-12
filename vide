@@ -1,50 +1,91 @@
 #!/bin/bash
 
-files=($@)
-
 session=0
 
-for s in $(tmux ls); do
-    if echo "$s" | grep -i "vide[0-9]" > /dev/null; then
-        if tmux ls -F '#{session_name}' | grep "vide$session" > /dev/null; then
-            let session++
-        else
-            break
-        fi
-    fi
+for s in $(ls -1 /tmp/videsock* 2>/dev/null); do
+    let session++
 done
 
-# set -x
-# bgColor=$(xrdb -query | grep -i background | awk '{print $2}')
-# borderBgColor=$(xrdb -query | grep -i color0 | awk '{print $2}')
-# fgColor=$(xrdb -query | grep -i "color1:" | awk '{print $2}')
-# set +x
+VIDESOCK="videsock$session"
+doProject=false
 
-# if ! echo $bgColor | grep "#.*" >/dev/null; then
-#     bgColor="NONE"
-# fi
+printUsage() {
+    echo "Usage:
+$0 [-h] [-p|--project [project name]]
+    -h --help                       print this help
+    -p --project [project name]     create or use project [project name]
+"
+}
 
-# if ! echo $fgColor | grep "#.*" >/dev/null; then
-#     fgColor="#ababab"
-# fi
+# Parse arguments
+args=("$@")
 
-cd $(projects select)
+argLen=${#args[@]}
 
-tmux new-session -d -s vide$session ' sleep 0.5; nvim --listen /tmp/videsock ; \
-    tmux kill-session -t vide$session'
+for (( i=0; i < $argLen; i++ )); do
+    case ${args[$i]} in
+        -h|--help)
+            printUsage
+            exit 0
+            ;;
+        -p|--project)
+            doProject=true
+            project=$(projects select)
 
-# Not sure of a better way to handle removing the second terminal if cols is < 120
-if [[ $(tput cols) < 120 ]]; then
+            # just in case user exits fzf without selecting a project
+            if [ -z $project ]; then
+                echo "Project not chosen, exiting."   
+                exit 1
+            fi
+            ;;
+        *)
+            echo "Unknown arg: ${args[$i]}"
+            printUsage
+            exit 1
+            ;;
+    esac
+done
+
+if ! $doProject; then
+    project=$(pwd)
+fi
+
+cd $project
+
+firstWidth=$((($(tput cols) - 30) / 2))
+if [ -z $TMUX ] || [ $TMUX = "" ]; then
+    tmux new-session -d -c $project -s vide$session " export VIDESOCK=$VIDESOCK; nvim -c \"source ~/.config/nvim/videexplorer.lua\" ."
+
     tmux a -d -t vide$session \; \
-        split-window -v ' bash' \; \
-        resize-pane -t 1 -y 10 \; \
-        select-pane -t 0 \; \
-        select-pane -t 0
+        split-window -h " export VIDESOCK=$VIDESOCK; nvim --listen /tmp/$VIDESOCK ; for i in 0 2 3; do tmux kill-pane -t \$i; done" \; \
+        split-window -v " export VIDESOCK=$VIDESOCK; zsh" \; \
+        split-window -h " export VIDESOCK=$VIDESOCK; zsh" \; \
+        send-keys \
+        " tmux resize-pane -t 0 -x 30" ENTER \
+        " tmux resize-pane -t 2 -y 15%" ENTER \
+        " tmux resize-pane -t 2 -x $firstWidth" ENTER \
+        " tmux select-pane -t 1" ENTER \
+        " tmux rename-window $(basename $PWD)" ENTER \
+        " clear" ENTER \;
+
+    sleep 1
+    kill -SIGWINCH $(pgrep nvim)
 else
-    tmux a -d -t vide$session \; \
-        split-window -h ' bash' \; \
-        split-window -v ' bash' \; \
-        resize-pane -t 1 -x 32% \; \
-        resize-pane -t 2 -x 32% \; \
-        select-pane -t 0
+    tmux split-window -h " export VIDESOCK=$VIDESOCK; nvim --listen /tmp/$VIDESOCK; for i in 0 2 3; do tmux kill-pane -t \$i; done"
+
+    tmux \
+        split-window -v " export VIDESOCK=$VIDESOCK; zsh" \; \
+        split-window -h " export VIDESOCK=$VIDESOCK; zsh" \; \
+        send-keys \
+        " tmux resize-pane -t 0 -x 30" ENTER \
+        " tmux resize-pane -t 2 -y 15%" ENTER \
+        " tmux resize-pane -t 2 -x $firstWidth" ENTER \
+        " tmux select-pane -t 1" ENTER \
+        " tmux rename-window $(basename $PWD)" ENTER \
+        " clear" ENTER \;
+
+    tmux send-keys -t 0 " cd $project; export VIDESOCK=$VIDESOCK; nvim -c \"source ~/.config/nvim/videexplorer.lua\" ." ENTER
+
+    sleep 1
+    kill -SIGWINCH $(pgrep nvim)
 fi
