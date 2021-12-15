@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ -z $TMUX ] || [ $TMUX = "" ]; then
+    echo "subshells and other non-sense make this a pain in the ass, start tmux first"
+    exit 1
+fi
+
 session=0
 
 for s in $(ls -1 /tmp/videsock* 2>/dev/null); do
@@ -53,39 +58,26 @@ fi
 cd $project
 
 firstWidth=$((($(tput cols) - 30) / 2))
-if [ -z $TMUX ] || [ $TMUX = "" ]; then
-    tmux new-session -d -c $project -s vide$session " export VIDESOCK=$VIDESOCK; nvim -c \"source ~/.config/nvim/videexplorer.lua\" ."
 
-    tmux a -d -t vide$session \; \
-        split-window -h " export VIDESOCK=$VIDESOCK; nvim --listen /tmp/$VIDESOCK ; for i in 0 2 3; do tmux kill-pane -t \$i; done" \; \
-        split-window -v " export VIDESOCK=$VIDESOCK; zsh" \; \
-        split-window -h " export VIDESOCK=$VIDESOCK; zsh" \; \
-        send-keys \
-        " tmux resize-pane -t 0 -x 30" ENTER \
-        " tmux resize-pane -t 2 -y 15%" ENTER \
-        " tmux resize-pane -t 2 -x $firstWidth" ENTER \
-        " tmux select-pane -t 1" ENTER \
-        " tmux rename-window $(basename $PWD)" ENTER \
-        " clear" ENTER \;
+tmux send-keys -t 0 " cd $project; export VIDESOCK=$VIDESOCK; nvim -c \"source ~/.config/nvim/videexplorer.lua\" ." ENTER
 
-    sleep 1
-    kill -SIGWINCH $(pgrep nvim)
-else
-    tmux split-window -h " export VIDESOCK=$VIDESOCK; nvim --listen /tmp/$VIDESOCK; for i in 0 2 3; do tmux kill-pane -t \$i; done"
+tmux set-hook -g client-resized 'run-shell ~/git-clones/vide/scripts/resize.sh'
 
-    tmux \
-        split-window -v " export VIDESOCK=$VIDESOCK; zsh" \; \
-        split-window -h " export VIDESOCK=$VIDESOCK; zsh" \; \
-        send-keys \
-        " tmux resize-pane -t 0 -x 30" ENTER \
-        " tmux resize-pane -t 2 -y 15%" ENTER \
-        " tmux resize-pane -t 2 -x $firstWidth" ENTER \
-        " tmux select-pane -t 1" ENTER \
-        " tmux rename-window $(basename $PWD)" ENTER \
-        " clear" ENTER \;
+tmux split-window -h " export VIDESOCK=$VIDESOCK; nvim --listen /tmp/$VIDESOCK; for i in 0 2 3; do tmux kill-pane -t \$i; done"
 
-    tmux send-keys -t 0 " cd $project; export VIDESOCK=$VIDESOCK; nvim -c \"source ~/.config/nvim/videexplorer.lua\" ." ENTER
+tmux \
+    split-window -v " export VIDESOCK=$VIDESOCK; zsh" \; \
+    split-window -h " export VIDESOCK=$VIDESOCK; zsh" \;
 
-    sleep 1
-    kill -SIGWINCH $(pgrep nvim)
-fi
+height=$(echo "$(tmux display-message -p "#{window_height}") * 0.15" | bc | cut -d'.' -f1)
+
+tmux \
+    resize-pane -t 0 -x 30 \; \
+    resize-pane -t 2 -y $height \; \
+    resize-pane -t 2 -x $firstWidth \; \
+    select-pane -t 1 \; \
+    rename-window $(basename $PWD) \;
+
+sleep 1
+
+kill -SIGWINCH $(pgrep nvim)
