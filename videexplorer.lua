@@ -1,6 +1,13 @@
 local tree_cb = require'nvim-tree.config'.nvim_tree_callback
 local lib = require'nvim-tree.lib'
 
+local wallyImport = require("wally")
+local darken = require('wally.util').darken
+
+vim.cmd("highlight! NvimTreeNormal guibg=" .. darken(wallyImport.colors.bg_highlight, 0.5))
+vim.cmd("highlight! Normal guibg=" .. darken(wallyImport.colors.bg_highlight, 0.5))
+vim.cmd("highlight! CursorLine guibg=" .. wallyImport.colors.bg_highlight)
+
 vim.o.statusline = ""
 vim.o.showtabline = 0
 vim.o.ruler = false
