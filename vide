@@ -11,7 +11,7 @@ for s in $(ls -1 /tmp/videsock* 2>/dev/null); do
     let session++
 done
 
-VIDESOCK="videsock$session"
+VIDESOCK="/tmp/videsock$session"
 doProject=false
 
 printUsage() {
@@ -59,17 +59,17 @@ cd $project
 
 firstWidth=$((($(tput cols) - 30) / 2))
 
-tmux send-keys -t 0 " cd $project; export VIDESOCK=$VIDESOCK; nvim -c \"source ~/.config/nvim/videexplorer.lua\" ." ENTER
+tmux send-keys -t 0 " cd $project; NNN_OPTS='cHRD' NNN_OPENER='nvim --server "$VIDESOCK" --remote' nnn -Tv" ENTER
 
 tmux set-hook -g client-resized 'run-shell ~/git-clones/vide/scripts/resize.sh'
 
-tmux split-window -h " export VIDESOCK=$VIDESOCK; nvim --listen /tmp/$VIDESOCK; for i in 0 2 3; do tmux kill-pane -t \$i; done"
+tmux split-window -h " export VIDESOCK=$VIDESOCK; nvim --listen $VIDESOCK; for i in 0 2 3; do tmux kill-pane -t \$i; done"
 
 tmux \
     split-window -v " export VIDESOCK=$VIDESOCK; zsh" \; \
     split-window -h " export VIDESOCK=$VIDESOCK; zsh" \;
 
-height=$(echo "$(tmux display-message -p "#{window_height}") * 0.15" | bc | cut -d'.' -f1)
+height=$(echo "$(tmux display-message -p "#{window_height}") * 0.20" | bc | cut -d'.' -f1)
 
 tmux \
     resize-pane -t 0 -x 30 \; \
